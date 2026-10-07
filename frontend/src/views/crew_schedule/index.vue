@@ -79,9 +79,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('crew_schedule')
+const store = useSessionStore()
 const columns = ["人员编号", "姓名", "岗位类别", "所属班组", "排班日期", "值班时段", "在岗状态", "联络方式"]
 const actions = ["安排排班", "确认在岗", "登记离岗"]
 const statuses = ["待排班", "已排班", "在岗", "已离岗"]
@@ -114,7 +116,10 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return

@@ -79,9 +79,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('cabin_clean')
+const store = useSessionStore()
 const columns = ["清洁编号", "关联航班", "清洁类型", "清洁班组", "计划开始", "实际完成", "清洁用时", "清洁状态"]
 const actions = ["开始清洁", "完成清洁", "安排复查"]
 const statuses = ["待清洁", "清洁中", "已完成", "需复查"]
@@ -114,7 +116,10 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return

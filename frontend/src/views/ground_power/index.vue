@@ -79,9 +79,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('ground_power')
+const store = useSessionStore()
 const columns = ["设备编号", "设备类型", "所属机位", "输出电压", "额定电流", "供电开始", "供电结束", "设备状态"]
 const actions = ["开始供电", "结束供电", "停用报修"]
 const statuses = ["待机", "供电中", "已断电", "故障停用"]
@@ -114,7 +116,10 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return

@@ -79,9 +79,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('pushback')
+const store = useSessionStore()
 const columns = ["牵引编号", "关联航班", "牵引车型", "操作人员", "推出机位", "推出方向", "完成时间", "牵引状态"]
 const actions = ["派出车辆", "开始推出", "确认完成"]
 const statuses = ["待牵引", "已就位", "推出中", "已完成"]
@@ -114,7 +116,10 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return

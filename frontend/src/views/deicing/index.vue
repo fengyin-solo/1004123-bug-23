@@ -79,9 +79,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('deicing')
+const store = useSessionStore()
 const columns = ["除冰编号", "关联航班", "除冰液类型", "预计用量", "实际用量", "开始时间", "结束时间", "作业状态"]
 const actions = ["开始除冰", "确认完成", "取消作业"]
 const statuses = ["待除冰", "作业中", "已完成", "已取消"]
@@ -114,7 +116,10 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return

@@ -41,11 +41,22 @@ export function listRows(key: string): EntryRow[] {
 }
 
 export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
-  cache = next
-  if (typeof window !== 'undefined' && window.localStorage) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  commitRows([[key, rows]])
+}
+
+// 跨模块的连带改动必须走原子提交：序列化一次写入，任何一环失败都不改动缓存，
+// 调用方重试时拿到的仍是原记录，不会出现半个台账。
+export function commitRows(patches: Array<[string, EntryRow[]]>): void {
+  const next: Record<string, EntryRow[]> = { ...allRows() }
+  for (const [key, rows] of patches) {
+    next[key] = rows
   }
+  const serialized = JSON.stringify(next)
+  if (typeof window !== 'undefined' && window.localStorage) {
+    // 先写存储，成功后才换内存缓存，避免存储层失败导致内存与台账不一致。
+    window.localStorage.setItem(STORAGE_KEY, serialized)
+  }
+  cache = next
 }
 
 export function resetRows(key: string): EntryRow[] {

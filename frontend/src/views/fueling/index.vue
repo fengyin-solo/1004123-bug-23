@@ -79,9 +79,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('fueling')
+const store = useSessionStore()
 const columns = ["加油编号", "关联航班", "燃油型号", "加油量", "加油车号", "加油开始", "加油结束", "记录状态"]
 const actions = ["开始加油", "完成加油", "复核记录"]
 const statuses = ["待加油", "加油中", "已完成", "已复核"]
@@ -114,7 +116,10 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return

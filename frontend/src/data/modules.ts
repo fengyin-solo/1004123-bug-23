@@ -12,6 +12,7 @@ export const MODULES: ModuleMeta[] = [
     actions: ["分配机位", "确认占用", "释放机位"],
     actionTargets: {"分配机位": "已分配", "确认占用": "占用中", "释放机位": "已释放"},
     metrics: ["空闲机位", "占用中机位", "已分配机位"],
+    terminalStatuses: ["已释放"],
   },
   {
     key: "bridge",
@@ -23,6 +24,7 @@ export const MODULES: ModuleMeta[] = [
     actions: ["安排对接", "确认脱离", "停用报修"],
     actionTargets: {"安排对接": "已对接", "确认脱离": "已脱离", "停用报修": "故障停用"},
     metrics: ["待对接廊桥", "已对接廊桥", "故障廊桥"],
+    terminalStatuses: ["已脱离", "故障停用"],
   },
   {
     key: "ground_power",

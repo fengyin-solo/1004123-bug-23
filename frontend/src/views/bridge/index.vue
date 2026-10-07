@@ -46,6 +46,7 @@
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
+            <button class="link" type="button" @click="openDetail(row)">详情</button>
             <button
               v-for="action in actions"
               :key="action"
@@ -63,6 +64,31 @@
       </tbody>
     </table>
 
+    <div v-if="detail" class="detail-panel">
+      <header class="detail-head">
+        <strong>廊桥详情 · {{ detail['廊桥编号'] }}</strong>
+        <button class="link" type="button" @click="closeDetail">关闭</button>
+      </header>
+      <table class="data-table">
+        <tbody>
+          <tr v-for="item in detailRows" :key="item.label">
+            <th>{{ item.label }}</th>
+            <td :class="{ 'detail-status': item.label === '当前状态' }">{{ item.value }}</td>
+          </tr>
+          <tr>
+            <th>关联机位占用结论</th>
+            <td>{{ occupancyText }}</td>
+          </tr>
+          <tr>
+            <th>故障停用记录</th>
+            <td :class="{ 'error-text': detail.abnormal }">
+              {{ detail.abnormal ? '存在故障停用记录' : '无' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条廊桥调度记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -75,13 +101,17 @@ import { computed, onMounted, ref } from 'vue'
 
 import {
   downloadEntries,
+  getEntry,
+  linkedStandOf,
   listEntries,
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('bridge')
+const store = useSessionStore()
 const columns = ["廊桥编号", "所属机位", "对接机型", "调度人员", "计划对接", "实际对接", "脱离时间", "廊桥状态"]
 const actions = ["安排对接", "确认脱离", "停用报修"]
 const statuses = ["待对接", "已对接", "已脱离", "故障停用"]
@@ -92,12 +122,41 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const detailId = ref<number | null>(null)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+// 详情不做本地快照，始终从台账读取规范记录，保证和列表、机位占用结论一致。
+const detail = computed<EntryRow | null>(() =>
+  detailId.value === null ? null : getEntry(meta.key, detailId.value),
+)
+
+const detailRows = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+  const row = detail.value
+  return [
+    ...meta.fields.map((field) => ({ label: field, value: String(row[field] ?? '—') })),
+    { label: '当前状态', value: String(row.status) },
+  ]
+})
+
+// 占用结论直接来自机位分配台账，解除后结论同步变为已释放。
+const occupancyText = computed(() => {
+  if (!detail.value) {
+    return ''
+  }
+  const linked = linkedStandOf(detail.value)
+  if (!linked) {
+    return '未匹配到机位分配台账'
+  }
+  return `机位 ${linked.stand['机位编号']}：${linked.occupancy}`
+})
 
 function resetFilters() {
   filters.value = {}
@@ -112,9 +171,21 @@ function openCreate() {
   errorMessage.value = '廊桥登记入口尚未接入审批流'
 }
 
+function openDetail(row: EntryRow) {
+  detailId.value = Number(row.id)
+  errorMessage.value = ''
+}
+
+function closeDetail() {
+  detailId.value = null
+}
+
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const result = applyAction(meta.key, Number(row.id), action, {
+    operator: store.operator,
+    role: store.role,
+  })
   if (!result.ok) {
     errorMessage.value = result.message
     return
