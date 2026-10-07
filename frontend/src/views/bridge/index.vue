@@ -47,7 +47,7 @@
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in actionsFor(row)"
               :key="action"
               class="link"
               type="button"
@@ -55,6 +55,7 @@
             >
               {{ action }}
             </button>
+            <span v-if="!actionsFor(row).length" class="muted-text">无可执行动作</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -65,7 +66,8 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条廊桥调度记录</span>
-      <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
+      <span v-if="noticeMessage" class="info-text">{{ noticeMessage }}</span>
+      <span v-else-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
 </template>
@@ -74,6 +76,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
+  availableActions,
   downloadEntries,
   listEntries,
   moduleMeta,
@@ -83,13 +86,12 @@ import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('bridge')
 const columns = ["廊桥编号", "所属机位", "对接机型", "调度人员", "计划对接", "实际对接", "脱离时间", "廊桥状态"]
-const actions = ["安排对接", "确认脱离", "停用报修"]
 const statuses = ["待对接", "已对接", "已脱离", "故障停用"]
-const stats = [{"label": "待对接廊桥", "value": 0}, {"label": "已对接廊桥", "value": 0}, {"label": "故障廊桥", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const noticeMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -98,6 +100,20 @@ const statusSummary = computed(() =>
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+// 统计卡与列表同源，解除后「已对接」立刻减一，不再与台账对不上。
+const stats = computed(() => {
+  const countOf = (status: string) =>
+    rows.value.filter((row) => String(row.status) === status).length
+  return [
+    { label: "待对接廊桥", value: countOf("待对接") },
+    { label: "已对接廊桥", value: countOf("已对接") },
+    { label: "故障廊桥", value: rows.value.filter((row) => row.abnormal).length },
+  ]
+})
+
+function actionsFor(row: EntryRow): string[] {
+  return availableActions(meta.key, row)
+}
 
 function resetFilters() {
   filters.value = {}
@@ -114,16 +130,19 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
+  noticeMessage.value = ''
   const result = applyAction(meta.key, Number(row.id), action)
   if (!result.ok) {
     errorMessage.value = result.message
     return
   }
+  noticeMessage.value = result.message
   reload()
 }
 
 function reload() {
   errorMessage.value = ''
+  noticeMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items

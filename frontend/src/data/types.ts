@@ -32,6 +32,16 @@ export type ActionResult = {
   message: string
 }
 
+// 当前操作人：动作流转要带上身份，只读角色执行写操作必须被拒绝。
+export type Actor = {
+  operator: string
+  role: string
+}
+
+export type RunActionOptions = {
+  actor?: Actor
+}
+
 export type OverviewResult = {
   cards: { label: string; value: number }[]
   modules: { name: string; created: number; pending: number; abnormal: number }[]

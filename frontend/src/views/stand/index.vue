@@ -47,7 +47,7 @@
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in actionsFor(row)"
               :key="action"
               class="link"
               type="button"
@@ -55,6 +55,7 @@
             >
               {{ action }}
             </button>
+            <span v-if="!actionsFor(row).length" class="muted-text">无可执行动作</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -65,7 +66,8 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条机位分配记录</span>
-      <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
+      <span v-if="noticeMessage" class="info-text">{{ noticeMessage }}</span>
+      <span v-else-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
 </template>
@@ -74,6 +76,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
+  availableActions,
   downloadEntries,
   listEntries,
   moduleMeta,
@@ -83,13 +86,12 @@ import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('stand')
 const columns = ["机位编号", "机位类型", "所属航站楼", "匹配航班", "计划占用", "实际占用", "分配状态", "备注说明"]
-const actions = ["分配机位", "确认占用", "释放机位"]
 const statuses = ["空闲", "已分配", "占用中", "已释放"]
-const stats = [{"label": "空闲机位", "value": 0}, {"label": "占用中机位", "value": 0}, {"label": "已分配机位", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const noticeMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -98,6 +100,20 @@ const statusSummary = computed(() =>
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+// 统计卡与台账同源：廊桥脱离联动释放后，占用中数量立刻回落。
+const stats = computed(() => {
+  const countOf = (status: string) =>
+    rows.value.filter((row) => String(row.status) === status).length
+  return [
+    { label: "空闲机位", value: countOf("空闲") },
+    { label: "占用中机位", value: countOf("占用中") },
+    { label: "已分配机位", value: countOf("已分配") },
+  ]
+})
+
+function actionsFor(row: EntryRow): string[] {
+  return availableActions(meta.key, row)
+}
 
 function resetFilters() {
   filters.value = {}
@@ -114,16 +130,19 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
+  noticeMessage.value = ''
   const result = applyAction(meta.key, Number(row.id), action)
   if (!result.ok) {
     errorMessage.value = result.message
     return
   }
+  noticeMessage.value = result.message
   reload()
 }
 
 function reload() {
   errorMessage.value = ''
+  noticeMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
